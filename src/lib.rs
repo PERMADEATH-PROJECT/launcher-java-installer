@@ -216,6 +216,18 @@ impl JavaSetup {
     }
 
     pub async fn setup(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        // Format download_path to remove the file name and keep only the directory
+        let download_dir = Path::new(&self.downloader.download_path)
+            .parent()
+            .unwrap_or(Path::new("."))
+            .to_str()
+            .unwrap_or(".");
+
+        // If the download directory does not exist, create it
+        if !Path::new(download_dir).exists() {
+            fs::create_dir_all(download_dir)?;
+        }
+
         println!("Starting download...");
         self.downloader.download().await?;
         println!("Extracting...");
@@ -226,7 +238,16 @@ impl JavaSetup {
         unsafe {
             self.env_configurator.configure()?;
         }
-        println!("Done!");
+        println!("Done! Deleting temporary files...");
+
+        if !Path::new(download_dir).exists() {
+            println!("No temporary files to delete.");
+            return Ok(());
+        }
+
+        fs::remove_dir_all(download_dir)?;
+        println!("Temporary files deleted.");
+
         Ok(())
     }
 }
