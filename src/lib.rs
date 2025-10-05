@@ -145,15 +145,46 @@ impl EnvironmentVariableConfigurator {
     pub unsafe fn configure(&self) -> Result<(), Box<dyn std::error::Error>> {
         let jdk_bin_path = format!("{}\\bin", self.install_path);
         let current_path = std::env::var("PATH").unwrap_or_default();
-        println!("Current PATH: {}", current_path);
-        // Adds JDK bin to PATH if not already present
+        println!("Actual PATH: {}", current_path);
+
+        // Update the current process PATH
         if !current_path.contains(&jdk_bin_path) {
             let new_path = format!("{};{}", current_path, jdk_bin_path);
+            unsafe {
             std::env::set_var("PATH", &new_path);
-            println!("PATH updated with JDK bin.");
+            }
+            println!("Updated PATH with JDK bin.");
         } else {
-            println!("PATH already contains JDK bin.");
+            println!("The PATH already contains the JDK bin.");
         }
+
+        // Generates and runs the PowerShell script to update the user's PATH
+        let script_content = format!(
+            r#"
+$jdkPath = "{jdk_bin_path}"
+$userPath = [Environment]::GetEnvironmentVariable("PATH", "User")
+if ($userPath -notlike "*$jdkPath*") {{
+    $newPath = "$userPath;$jdkPath"
+    [Environment]::SetEnvironmentVariable("PATH", $newPath, "User")
+    Write-Host "Updated user's PATH."
+}} else {{
+    Write-Host "PATH already contains the JDK."
+}}
+"#);
+
+        let script_path = "add_jdk_to_path.ps1";
+        fs::write(script_path, script_content)?;
+
+        let status = std::process::Command::new("powershell")
+            .args(&["-ExecutionPolicy", "Bypass", "-File", script_path])
+            .status()?;
+
+        if status.success() {
+            println!("Powershell script executed correctly.");
+        } else {
+            println!("There was an error executing the PowerShell script.");
+        }
+
         Ok(())
     }
 }
