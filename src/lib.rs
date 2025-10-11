@@ -172,11 +172,18 @@ if ($userPath -notlike "*$jdkPath*") {{
 }}
 "#);
 
-        let script_path = "add_jdk_to_path.ps1";
-        fs::write(script_path, script_content)?;
+        // Get main disk
+        let main_disk = std::env::var("SystemDrive").unwrap_or_else(|_| "C:".into());
+        println!("Main disk: {}", main_disk);
+
+        // Get %temp% dir
+        let temp_dir = std::env::var("TEMP").unwrap_or_else(|_| format!("{}\\Temp", main_disk).into());
+        let script_path = format!("{}\\add_jdk_to_path.ps1", temp_dir);
+        println!("Creating PowerShell script at: {}", &script_path);
+        fs::write(&script_path, script_content)?;
 
         let status = std::process::Command::new("powershell")
-            .args(&["-ExecutionPolicy", "Bypass", "-File", script_path])
+            .args(&["-ExecutionPolicy", "Bypass", "-File", &script_path])
             .status()?;
 
         if status.success() {
